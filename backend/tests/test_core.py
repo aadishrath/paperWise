@@ -8,7 +8,7 @@ from app.documents import extract_text, split_text
 from app.citation_validation import InvalidCitations, cited_passages
 from app.evaluation import score_case, summarize
 from app.retrieval import cosine_similarity, rank_chunks
-from app.ollama import OllamaError
+from app.ollama import OllamaClient, OllamaError
 from app.workflow import AnswerWorkflow
 
 
