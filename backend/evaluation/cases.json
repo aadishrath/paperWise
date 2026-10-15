@@ -1,0 +1,26 @@
+[
+  {
+    "question": "How long do customers have to return an unused item?",
+    "expected_source": "product-handbook.md",
+    "expected_phrases": ["30 days", "delivery"]
+  },
+  {
+    "question": "Which items cannot be returned?",
+    "expected_source": "product-handbook.md",
+    "expected_phrases": ["final-sale", "gift cards"]
+  },
+  {
+    "question": "How long can a refund take to appear?",
+    "expected_source": "product-handbook.md",
+    "expected_phrases": ["five to seven business days", "inspected"]
+  },
+  {
+    "question": "When is customer support open?",
+    "expected_source": "product-handbook.md",
+    "expected_phrases": ["monday through friday", "pacific time"]
+  },
+  {
+    "question": "What is the capital of France?",
+    "expected_phrases": []
+  }
+]

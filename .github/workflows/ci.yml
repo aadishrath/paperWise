@@ -1,0 +1,50 @@
+name: PaperWise checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    container: python:3.12-slim
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: paperwise
+          POSTGRES_PASSWORD: paperwise
+          POSTGRES_DB: paperwise_test
+        options: >-
+          --health-cmd "pg_isready -U paperwise -d paperwise_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      PAPERWISE_TEST_DATABASE_URL: postgresql://paperwise:paperwise@postgres:5432/paperwise_test
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install backend and test dependencies
+        run: pip install -e 'backend[dev]'
+      - name: Run tests
+        run: pytest -q backend/tests
+
+  frontend:
+    runs-on: ubuntu-latest
+    container: node:22-alpine
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Check TypeScript
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run build

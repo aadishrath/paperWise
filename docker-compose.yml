@@ -1,0 +1,121 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: paperwise
+      POSTGRES_PASSWORD: paperwise
+      POSTGRES_DB: paperwise
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperwise -d paperwise"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+  ollama-models:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "until ollama list >/dev/null 2>&1; do sleep 2; done; ollama pull nomic-embed-text && ollama pull gemma3:4b"
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql://paperwise:paperwise@postgres:5432/paperwise
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_CHAT_MODEL: gemma3:4b
+      OLLAMA_EMBED_MODEL: nomic-embed-text
+      OLLAMA_EMBED_DIMENSIONS: 768
+      REDIS_URL: redis://redis:6379/0
+      PAPERWISE_DATA_DIR: /data
+      PAPERWISE_ENABLE_OCR: "true"
+      MIN_RELEVANCE_SCORE: 0.28
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
+      FRONTEND_ORIGIN: http://localhost:3000
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - paperwise-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama-models:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: ./backend
+    command: [
+      "celery",
+      "-A",
+      "app.celery_app:celery",
+      "worker",
+      "--loglevel=INFO",
+      "--concurrency=1",
+    ]
+    environment:
+      DATABASE_URL: postgresql://paperwise:paperwise@postgres:5432/paperwise
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_CHAT_MODEL: gemma3:4b
+      OLLAMA_EMBED_MODEL: nomic-embed-text
+      OLLAMA_EMBED_DIMENSIONS: 768
+      REDIS_URL: redis://redis:6379/0
+      PAPERWISE_DATA_DIR: /data
+      PAPERWISE_ENABLE_OCR: "true"
+      MIN_RELEVANCE_SCORE: 0.28
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
+    volumes:
+      - paperwise-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama-models:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  ollama-data:
+  redis-data:
+  paperwise-data:
